@@ -1,8 +1,13 @@
+"""
+Example WeightNorm graph execution
+"""
+import os
+import time
 import numpy as np
 import tensorflow as tf
 from matplotlib import pyplot as plt
 from tensorflow.keras.datasets.cifar10 import load_data
-from tensorflow.contrib.layers import weight_normalization
+from tensorflow.keras.layers import WeightNorm
 
 
 def regular_net(x, n_classes):
@@ -25,10 +30,47 @@ def regular_net(x, n_classes):
 
         net = tf.layers.dense(net, n_classes)
 
-        return net
+    return net
 
 
-def train(x, y, num_epochs, batch_size):
+def weightnorm_net(x, n_classes):
+    with tf.variable_scope('WeightNorm'):
+        net = WeightNorm(tf.layers.Conv2D(6, 5, activation='relu'),
+                         input_shape=x.shape[1:])(x)
+
+        net = tf.layers.MaxPooling2D(2, 2)(net)
+
+        net = WeightNorm(tf.layers.Conv2D(16, 5, activation='relu'))(net)
+        net = tf.layers.MaxPooling2D(2, 2)(net)
+
+        net = tf.layers.Flatten()(net)
+        net = WeightNorm(tf.layers.Dense(120, activation='relu'))(net)
+        net = WeightNorm(tf.layers.Dense(84, activation='relu'))(net)
+        net = WeightNorm(tf.layers.Dense(n_classes))(net)
+
+    return net
+
+
+def weightnorm_keras_net(x, n_classes):
+    with tf.variable_scope('WeightNormKeras'):
+        net = WeightNorm(tf.keras.layers.Conv2D(6, 5, activation='relu'),
+                         input_shape=x.shape[1:])(x)
+
+        net = tf.keras.layers.MaxPooling2D(2, 2)(net)
+
+        net = WeightNorm(tf.keras.layers.Conv2D(16, 5, activation='relu'))(net)
+        net = tf.keras.layers.MaxPooling2D(2, 2)(net)
+
+        net = tf.keras.layers.Flatten()(net)
+        net = WeightNorm(tf.keras.layers.Dense(120, activation='relu'))(net)
+        net = WeightNorm(tf.keras.layers.Dense(84, activation='relu'))(net)
+        net = WeightNorm(tf.keras.layers.Dense(n_classes))(net)
+
+    return net
+
+
+def train(x, y, num_epochs, batch_size, weightnorm=None):
+
     train_dataset = tf.data.Dataset.from_tensor_slices((x, y))
     train_dataset = train_dataset.shuffle(x.shape[0])
     train_dataset = train_dataset.repeat(num_epochs)
@@ -36,21 +78,21 @@ def train(x, y, num_epochs, batch_size):
     iterator = train_dataset.make_initializable_iterator()
 
     inputs, labels = iterator.get_next()
-    inputs = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame), inputs, dtype=tf.float32)
+    inputs = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame),
+                       inputs, dtype=tf.float32)
 
-    inputs = tf.Print(inputs, [inputs])
+    if weightnorm is None:
+        logits = regular_net(inputs, 10)
+    elif weightnorm == 'tf':
+        logits = weightnorm_net(inputs, 10)
+    elif weightnorm == 'keras':
+        logits = weightnorm_keras_net(inputs, 10)
 
-    logits = regular_net(inputs, 10)
-
-    logits = tf.Print(logits, [logits])
-    labels = tf.Print(labels, [labels])
-
-    loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels))
-
-    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+    labels = tf.cast(labels, tf.int32)
+    loss_op = tf.losses.sparse_softmax_cross_entropy(logits=logits, labels=labels)
+    optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum)
 
     train_op = optimizer.minimize(loss_op)
-
     init = tf.global_variables_initializer()
 
     step = 0
@@ -60,6 +102,9 @@ def train(x, y, num_epochs, batch_size):
     with tf.Session() as sess:
         sess.run(init)
         sess.run(iterator.initializer)
+
+        graph_path = os.path.join(os.getcwd(), 'train')
+        tf.summary.FileWriter(graph_path, sess.graph)
 
         while True:
             try:
@@ -78,7 +123,7 @@ def train(x, y, num_epochs, batch_size):
 if __name__ == "__main__":
     learning_rate = 0.001
     momentum = 0.9
-    num_epochs = 2
+    num_epochs = 3
     batch_size = 128
     n_classes = 10
     (train_x, train_y), (test_x, test_y) = load_data()
@@ -86,11 +131,37 @@ if __name__ == "__main__":
     train_x = train_x.astype(float)
     train_y = train_y.astype(float)
 
-    regular_loss = train(train_x, train_y, num_epochs, batch_size)
+    # Regular Parameterization
+    start = time.time()
+    with tf.Graph().as_default():
+        regular_loss = train(train_x, train_y, num_epochs, batch_size)
+    regular_time = time.time() - start
     regular_loss = np.asarray(regular_loss)
+    size = regular_loss.shape[0]
+    plt.plot(np.linspace(0, size, size), regular_loss, color='blue', label='regular parameterization')
 
-    num_data = regular_loss.shape[0]
-    plt.plot(np.linspace(0, num_data, num_data), regular_loss,
-             color='blue', label='regular parameterization')
+    # Layers Implementation
+    start = time.time()
+    with tf.Graph().as_default():
+        weightnorm_loss = train(train_x, train_y, num_epochs, batch_size, weightnorm='tf')
+    layers_time = time.time() - start
+    weightnorm_loss = np.asarray(weightnorm_loss)
+    plt.plot(np.linspace(0, weightnorm_loss.shape[0], weightnorm_loss.shape[0]), weightnorm_loss,
+             color='green', label='weightnorm')
+
+    # Keras Implementation
+    start = time.time()
+    with tf.Graph().as_default():
+        weightnorm_keras_loss = train(train_x, train_y, num_epochs, batch_size, weightnorm='keras')
+    keras_time = time.time() - start
+    weightnorm_keras_loss = np.asarray(weightnorm_keras_loss)
+    plt.plot(np.linspace(0, weightnorm_keras_loss.shape[0],
+                         weightnorm_keras_loss.shape[0]), weightnorm_keras_loss,
+             color='red', label='keras-weightnorm')
+
     plt.legend()
     plt.show()
+
+    print('Regular Time: {0}'.format(regular_time))
+    print('Layers Time: {0}'.format(layers_time))
+    print('Keras Time: {0}'.format(keras_time))
