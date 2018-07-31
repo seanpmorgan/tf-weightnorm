@@ -2,12 +2,13 @@
 Example WeightNorm graph execution
 """
 import os
-import time
+import shutil
 import numpy as np
 import tensorflow as tf
+
 from matplotlib import pyplot as plt
 from tensorflow.keras.datasets.cifar10 import load_data
-from tensorflow.keras.layers import WeightNorm
+from tensorflow.contrib.layers import WeightNorm
 
 
 def regular_net(x, n_classes):
@@ -69,7 +70,7 @@ def weightnorm_keras_net(x, n_classes):
     return net
 
 
-def train(x, y, num_epochs, batch_size, weightnorm=None):
+def train(x, y, num_epochs, batch_size, graph_type='regular'):
 
     train_dataset = tf.data.Dataset.from_tensor_slices((x, y))
     train_dataset = train_dataset.shuffle(x.shape[0])
@@ -81,14 +82,15 @@ def train(x, y, num_epochs, batch_size, weightnorm=None):
     inputs = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame),
                        inputs, dtype=tf.float32)
 
-    if weightnorm is None:
+    if graph_type == 'regular':
         logits = regular_net(inputs, 10)
-    elif weightnorm == 'tf':
+    elif graph_type == 'tf':
         logits = weightnorm_net(inputs, 10)
-    elif weightnorm == 'keras':
+    elif graph_type == 'keras':
         logits = weightnorm_keras_net(inputs, 10)
+    else:
+        raise ValueError
 
-    labels = tf.cast(labels, tf.int32)
     loss_op = tf.losses.sparse_softmax_cross_entropy(logits=logits, labels=labels)
     optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum)
 
@@ -103,7 +105,7 @@ def train(x, y, num_epochs, batch_size, weightnorm=None):
         sess.run(init)
         sess.run(iterator.initializer)
 
-        graph_path = os.path.join(os.getcwd(), 'train')
+        graph_path = os.path.join(os.getcwd(), 'train', graph_type)
         tf.summary.FileWriter(graph_path, sess.graph)
 
         while True:
@@ -112,7 +114,6 @@ def train(x, y, num_epochs, batch_size, weightnorm=None):
                 step += 1
                 running_loss += (loss / batch_size)
                 if step % 32 == (32 - 1):
-                    print(step, running_loss)
                     running_loss_array.append(running_loss)
                     running_loss = 0.0
 
@@ -126,42 +127,41 @@ if __name__ == "__main__":
     num_epochs = 3
     batch_size = 128
     n_classes = 10
+
+    shutil.rmtree('train/')
+    os.makedirs('train')
+    os.makedirs('train/tf')
+    os.makedirs('train/regular')
+    os.makedirs('train/keras')
+
     (train_x, train_y), (test_x, test_y) = load_data()
-
-    train_x = train_x.astype(float)
-    train_y = train_y.astype(float)
-
-    # Regular Parameterization
-    start = time.time()
-    with tf.Graph().as_default():
-        regular_loss = train(train_x, train_y, num_epochs, batch_size)
-    regular_time = time.time() - start
-    regular_loss = np.asarray(regular_loss)
-    size = regular_loss.shape[0]
-    plt.plot(np.linspace(0, size, size), regular_loss, color='blue', label='regular parameterization')
-
-    # Layers Implementation
-    start = time.time()
-    with tf.Graph().as_default():
-        weightnorm_loss = train(train_x, train_y, num_epochs, batch_size, weightnorm='tf')
-    layers_time = time.time() - start
-    weightnorm_loss = np.asarray(weightnorm_loss)
-    plt.plot(np.linspace(0, weightnorm_loss.shape[0], weightnorm_loss.shape[0]), weightnorm_loss,
-             color='green', label='weightnorm')
+    train_x, train_y = train_x.astype(np.float32), train_y.astype(np.int)
 
     # Keras Implementation
-    start = time.time()
     with tf.Graph().as_default():
-        weightnorm_keras_loss = train(train_x, train_y, num_epochs, batch_size, weightnorm='keras')
-    keras_time = time.time() - start
+        weightnorm_keras_loss = train(train_x, train_y, num_epochs, batch_size, graph_type='keras')
+
+    print(weightnorm_keras_loss)
     weightnorm_keras_loss = np.asarray(weightnorm_keras_loss)
     plt.plot(np.linspace(0, weightnorm_keras_loss.shape[0],
                          weightnorm_keras_loss.shape[0]), weightnorm_keras_loss,
              color='red', label='keras-weightnorm')
 
+    # Layers Implementation
+    with tf.Graph().as_default():
+        weightnorm_loss = train(train_x, train_y, num_epochs, batch_size, graph_type='tf')
+
+    weightnorm_loss = np.asarray(weightnorm_loss)
+    plt.plot(np.linspace(0, weightnorm_loss.shape[0], weightnorm_loss.shape[0]), weightnorm_loss,
+             color='green', label='weightnorm')
+
+    # Regular Parameterization
+    with tf.Graph().as_default():
+        regular_loss = train(train_x, train_y, num_epochs, batch_size)
+
+    regular_loss = np.asarray(regular_loss)
+    size = regular_loss.shape[0]
+    plt.plot(np.linspace(0, size, size), regular_loss, color='blue', label='regular parameterization')
+
     plt.legend()
     plt.show()
-
-    print('Regular Time: {0}'.format(regular_time))
-    print('Layers Time: {0}'.format(layers_time))
-    print('Keras Time: {0}'.format(keras_time))
