@@ -7,7 +7,7 @@ https://colab.research.google.com/drive/1nBQSAA78oUBmi9fhnHJ_zWhHq2NXjwIc
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.datasets.cifar10 import load_data
-from tensorflow.contrib.layers import WeightNorm
+from normalization import WeightNorm
 from matplotlib import pyplot as plt
 
 tf.enable_eager_execution()
@@ -17,17 +17,17 @@ tfe = tf.contrib.eager
 class WnModel(tf.keras.Model):
     def __init__(self):
         super(WnModel, self).__init__()
-        self.maxpool = tf.keras.layers.MaxPooling2D(2, 2)
+        self.maxpool = tf.layers.MaxPooling2D(2, 2)
 
-        self.conv1 = WeightNorm(tf.keras.layers.Conv2D(6, 5, activation='relu'),
+        self.conv1 = WeightNorm(tf.layers.Conv2D(6, 5, activation='relu'),
                                 input_shape=(32, 32, 3))
 
-        self.conv2 = WeightNorm(tf.keras.layers.Conv2D(16, 5, activation='relu'))
+        self.conv2 = WeightNorm(tf.layers.Conv2D(16, 5, activation='relu'))
 
-        self.flatten = tf.keras.layers.Flatten()
-        self.dense1 = WeightNorm(tf.keras.layers.Dense(120, activation='relu'))
-        self.dense2 = WeightNorm(tf.keras.layers.Dense(84, activation='relu'))
-        self.dense3 = WeightNorm(tf.keras.layers.Dense(n_classes))
+        self.flatten = tf.layers.Flatten()
+        self.dense1 = WeightNorm(tf.layers.Dense(120, activation='relu'))
+        self.dense2 = WeightNorm(tf.layers.Dense(84, activation='relu'))
+        self.dense3 = WeightNorm(tf.layers.Dense(n_classes))
 
     def call(self, input):
         x = self.maxpool(self.conv1(input))

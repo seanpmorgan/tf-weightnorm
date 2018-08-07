@@ -8,7 +8,7 @@ import tensorflow as tf
 
 from matplotlib import pyplot as plt
 from tensorflow.keras.datasets.cifar10 import load_data
-from tensorflow.contrib.layers import WeightNorm
+from normalization import WeightNorm
 
 
 def regular_net(x, n_classes):
