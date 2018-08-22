@@ -14,7 +14,36 @@ tf.enable_eager_execution()
 tfe = tf.contrib.eager
 
 
+class RegularModel(tf.keras.Model):
+    """
+    Standard conv net
+    """
+    def __init__(self):
+        super(RegularModel, self).__init__()
+        self.maxpool = tf.layers.MaxPooling2D(2, 2)
+
+        self.conv1 = tf.layers.Conv2D(6, 5, activation='relu')
+        self.conv2 = tf.layers.Conv2D(16, 5, activation='relu')
+
+        self.flatten = tf.layers.Flatten()
+        self.dense1 = tf.layers.Dense(120, activation='relu')
+        self.dense2 = tf.layers.Dense(84, activation='relu')
+        self.dense3 = tf.layers.Dense(n_classes)
+
+    def call(self, input):
+        x = self.maxpool(self.conv1(input))
+        x = self.maxpool(self.conv2(x))
+        x = self.flatten(x)
+        x = self.dense1(x)
+        x = self.dense2(x)
+        x = self.dense3(x)
+        return x
+
+
 class WnModel(tf.keras.Model):
+    """
+    Keras conv net with weight normalization applied
+    """
     def __init__(self):
         super(WnModel, self).__init__()
         self.maxpool = tf.layers.MaxPooling2D(2, 2)
@@ -28,29 +57,6 @@ class WnModel(tf.keras.Model):
         self.dense1 = WeightNorm(tf.layers.Dense(120, activation='relu'))
         self.dense2 = WeightNorm(tf.layers.Dense(84, activation='relu'))
         self.dense3 = WeightNorm(tf.layers.Dense(n_classes))
-
-    def call(self, input):
-        x = self.maxpool(self.conv1(input))
-        x = self.maxpool(self.conv2(x))
-        x = self.flatten(x)
-        x = self.dense1(x)
-        x = self.dense2(x)
-        x = self.dense3(x)
-        return x
-
-
-class RegularModel(tf.keras.Model):
-    def __init__(self):
-        super(RegularModel, self).__init__()
-        self.maxpool = tf.layers.MaxPooling2D(2, 2)
-
-        self.conv1 = tf.layers.Conv2D(6, 5, activation='relu')
-        self.conv2 = tf.layers.Conv2D(16, 5, activation='relu')
-
-        self.flatten = tf.layers.Flatten()
-        self.dense1 = tf.layers.Dense(120, activation='relu')
-        self.dense2 = tf.layers.Dense(84, activation='relu')
-        self.dense3 = tf.layers.Dense(n_classes)
 
     def call(self, input):
         x = self.maxpool(self.conv1(input))
@@ -84,6 +90,12 @@ def grad(model, inputs, targets):
 
 
 def train_and_eval(model, print_grads=False):
+    """
+    Train network with eager execution and evaluate on test set
+    :param model: `tf.Keras.Model` instance`
+    :param print_grads: Boolean to print the gradient tape on each pass
+    :return: Numpy array of losses, Numpy array of accuracy
+    """
 
     accuracy = tfe.metrics.Accuracy('accuracy')
     global_step = tf.train.get_or_create_global_step()
@@ -96,7 +108,8 @@ def train_and_eval(model, print_grads=False):
 
     for (x, y) in tfe.Iterator(train_dataset):
         step += 1
-        x = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame), x, dtype=tf.float32)
+        x = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame),
+                      x, dtype=tf.float32)
 
         loss_value, grads = grad(model, x, y)
         if print_grads:
@@ -111,7 +124,8 @@ def train_and_eval(model, print_grads=False):
 
     # Test Model
     for (x, y) in tfe.Iterator(test_dataset):
-        x = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame), x, dtype=tf.float32)
+        x = tf.map_fn(lambda frame: tf.image.per_image_standardization(frame),
+                      x, dtype=tf.float32)
         y = tf.reshape(y, [-1])
 
         logits = model(x)

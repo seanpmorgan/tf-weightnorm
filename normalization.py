@@ -1,3 +1,8 @@
+"""
+From pull request:
+https://github.com/tensorflow/tensorflow/pull/21276
+"""
+
 from tensorflow.keras.layers import Wrapper
 from tensorflow.python.keras.engine.base_layer import Layer
 from tensorflow.python.framework import tensor_shape
@@ -34,7 +39,7 @@ class WeightNorm(Wrapper):
     ```
 
     Arguments:
-      layer: a layer instance.
+      layer: a `Layer` instance.
       data_init: If `True` use data dependent variable initialization
 
     Raises:

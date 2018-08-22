@@ -12,6 +12,11 @@ from normalization import WeightNorm
 
 
 def regular_net(x, n_classes):
+    """
+    Standard conv net
+    :param x: Input mini batch
+    :param n_classes: Number of classes in network
+    """
     with tf.variable_scope('Regular'):
         net = tf.layers.conv2d(x, 6, 5)
         net = tf.nn.relu(net)
@@ -35,6 +40,11 @@ def regular_net(x, n_classes):
 
 
 def weightnorm_net(x, n_classes):
+    """
+    TF layers conv net with weight normalization applied
+    :param x: Input mini batch
+    :param n_classes: Number of classes in network
+    """
     with tf.variable_scope('WeightNorm'):
         net = WeightNorm(tf.layers.Conv2D(6, 5, activation='relu'),
                          input_shape=x.shape[1:])(x)
@@ -53,6 +63,11 @@ def weightnorm_net(x, n_classes):
 
 
 def weightnorm_keras_net(x, n_classes):
+    """
+    Keras conv net with weight normalization applied
+    :param x: Input mini batch
+    :param n_classes: Number of classes in network
+    """
     with tf.variable_scope('WeightNormKeras'):
         net = WeightNorm(tf.keras.layers.Conv2D(6, 5, activation='relu'),
                          input_shape=x.shape[1:])(x)
@@ -71,6 +86,15 @@ def weightnorm_keras_net(x, n_classes):
 
 
 def train(x, y, num_epochs, batch_size, graph_type='regular'):
+    """
+    Train a specified network architecture on a dataset
+    :param x: Inputs
+    :param y: Labels
+    :param num_epochs: Passes through data
+    :param batch_size: Mini batch size
+    :param graph_type: Network architecture
+    :return:
+    """
 
     train_dataset = tf.data.Dataset.from_tensor_slices((x, y))
     train_dataset = train_dataset.shuffle(x.shape[0])
@@ -91,8 +115,11 @@ def train(x, y, num_epochs, batch_size, graph_type='regular'):
     else:
         raise ValueError
 
-    loss_op = tf.losses.sparse_softmax_cross_entropy(logits=logits, labels=labels)
-    optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum)
+    loss_op = tf.losses.sparse_softmax_cross_entropy(logits=logits,
+                                                     labels=labels)
+
+    optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate,
+                                           momentum=momentum)
 
     train_op = optimizer.minimize(loss_op)
     init = tf.global_variables_initializer()
@@ -139,29 +166,32 @@ if __name__ == "__main__":
 
     # Keras Implementation
     with tf.Graph().as_default():
-        weightnorm_keras_loss = train(train_x, train_y, num_epochs, batch_size, graph_type='keras')
-
-    print(weightnorm_keras_loss)
+        weightnorm_keras_loss = train(train_x, train_y, num_epochs,
+                                      batch_size, graph_type='keras')
     weightnorm_keras_loss = np.asarray(weightnorm_keras_loss)
-    plt.plot(np.linspace(0, weightnorm_keras_loss.shape[0],
-                         weightnorm_keras_loss.shape[0]), weightnorm_keras_loss,
-             color='red', label='keras-weightnorm')
 
     # Layers Implementation
     with tf.Graph().as_default():
-        weightnorm_loss = train(train_x, train_y, num_epochs, batch_size, graph_type='tf')
-
+        weightnorm_loss = train(train_x, train_y, num_epochs,
+                                batch_size, graph_type='tf')
     weightnorm_loss = np.asarray(weightnorm_loss)
-    plt.plot(np.linspace(0, weightnorm_loss.shape[0], weightnorm_loss.shape[0]), weightnorm_loss,
-             color='green', label='weightnorm')
 
     # Regular Parameterization
     with tf.Graph().as_default():
         regular_loss = train(train_x, train_y, num_epochs, batch_size)
-
     regular_loss = np.asarray(regular_loss)
+
     size = regular_loss.shape[0]
-    plt.plot(np.linspace(0, size, size), regular_loss, color='blue', label='regular parameterization')
+    plt.plot(np.linspace(0, weightnorm_keras_loss.shape[0],
+                         weightnorm_keras_loss.shape[0]), weightnorm_keras_loss,
+             color='red', label='keras-weightnorm')
+
+    plt.plot(np.linspace(0, weightnorm_loss.shape[0], weightnorm_loss.shape[0]),
+             weightnorm_loss,
+             color='green', label='weightnorm')
+
+    plt.plot(np.linspace(0, size, size), regular_loss, color='blue',
+             label='regular parameterization')
 
     plt.legend()
     plt.show()

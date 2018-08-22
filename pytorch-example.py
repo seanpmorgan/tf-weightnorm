@@ -16,6 +16,9 @@ from matplotlib import pyplot as plt
 
 
 class Net(nn.Module):
+    """
+    Standard conv net
+    """
     def __init__(self):
         super(Net, self).__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
@@ -36,6 +39,9 @@ class Net(nn.Module):
 
 
 class WeightNormNet(nn.Module):
+    """
+    Conv net with weight normalization applied
+    """
     def __init__(self):
         super(WeightNormNet, self).__init__()
         self.conv1 = weight_norm(nn.Conv2d(3, 6, 5))
@@ -56,6 +62,12 @@ class WeightNormNet(nn.Module):
 
 
 def train(network, opt):
+    """
+    Train network architecture with given optimizer
+    :param network: `nn.Module` instance
+    :param opt: Criterion optimizer
+    :return: Numpy array of losses
+    """
     running_loss_array = []
 
     for epoch in range(50):  # 50 epochs
@@ -95,22 +107,27 @@ if __name__ == "__main__":
                                              shuffle=False, num_workers=2)
 
     regular_net = Net().cuda()
-    regular_optimizer = optim.SGD(regular_net.parameters(), lr=0.001, momentum=0.9)
+    regular_optimizer = optim.SGD(regular_net.parameters(), lr=0.001,
+                                  momentum=0.9)
 
     weightnorm_net = WeightNormNet().cuda()
-    weightnorm_optimizer = optim.SGD(weightnorm_net.parameters(), lr=0.001, momentum=0.9)
+    weightnorm_optimizer = optim.SGD(weightnorm_net.parameters(),
+                                     lr=0.001, momentum=0.9)
 
     criterion = nn.CrossEntropyLoss()
 
     regular_loss = train(regular_net, regular_optimizer)
     weightnorm_loss = train(weightnorm_net, weightnorm_optimizer)
-    print('Done Training!')
 
     regular_loss = np.asarray(regular_loss)
     weightnorm_loss = np.asarray(weightnorm_loss)
 
     num_data = regular_loss.shape[0]
-    plt.plot(np.linspace(0, num_data, num_data), regular_loss, color='blue', label='regular parameterization')
-    plt.plot(np.linspace(0, num_data, num_data), weightnorm_loss, color='red', label='weightnorm')
+    plt.plot(np.linspace(0, num_data, num_data), weightnorm_loss,
+             color='red', label='weightnorm')
+
+    plt.plot(np.linspace(0, num_data, num_data), regular_loss,
+             color='blue', label='regular parameterization')
+
     plt.legend()
     plt.show()
