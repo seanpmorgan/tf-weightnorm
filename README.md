@@ -2,7 +2,7 @@
 Examples for TensorFlow Weight Normalization
 
 
-**NOTE: This Repository is out of date.** <br>
+**NOTE: This repository is out of date.** <br>
 A more complete version has been implemented in TensorFlow Addons for TF 2.0
 
 * [**TensorFlow Addons Code**](https://github.com/tensorflow/addons/blob/master/tensorflow_addons/layers/wrappers.py)
